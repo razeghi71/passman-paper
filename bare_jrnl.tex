@@ -1,0 +1,218 @@
+\documentclass[journal]{IEEEtran}
+
+\bibliographystyle{plain} 
+
+
+\begin{document}
+
+
+\title{Design and Implementation of password manager Secured against Keyloggers on GNU/Linux}
+
+\author{Michael~Shell,~\IEEEmembership{Member,~IEEE,}
+    John~Doe,~\IEEEmembership{Fellow,~OSA,}
+    and~Jane~Doe,~\IEEEmembership{Life~Fellow,~IEEE}}
+
+
+
+\maketitle
+
+
+\begin{abstract}
+Number of applications that require authentication is increasing every day and using the same password for different services is considered as a security threat. On the other hand it's hard for a human being to memorize large amount of credentials. So password managers introduced to help users store and organize their passwords.
+
+Nowadays keyloggers are a serious threat for password manager softwares. If a keylogging software will be able to obtain users master password, then it can access all saved passwords.
+
+In this paper we propose a method to construct a password manager secured against keyloggers on GNU/Linux.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Password Manager, keylogger, GNU/Linux.
+\end{IEEEkeywords}
+
+
+
+\IEEEpeerreviewmaketitle
+
+
+
+\section{Introduction}
+	
+\IEEEPARstart{P}{assword manager} is a software application that helps a user store and organize passwords. Password managers usually store passwords encrypted, requiring the user to create a master password. a single, ideally very strong password which grants the user access to their entire password database \cite{wiki:passman}. Saving the master password on disk yield some security problems for password managers, so they just save the hashed version of it on disk and prompt it every time the software starts.
+
+Keyloggers are one of the most serious types of malware that surreptitiously log keyboard activity, and typically exfil-trate the recorded data to third parties \cite{holz2009learning}. If a keylogger record the master password, the attacker will be able access to all saved passwords by simply decrypt the password database and this is somehow decreasing the security instead of increasing it. 
+
+Citadel is a massively distributed malware that has already compromised millions of computers worldwide. Once Citadel installs on a machine, it opens communication channels with a command-and-control (C\&C) server and registers with it. The malware then receives a configuration file that tells it how it should operate. Recently, IBM Trusteer researchers found a new configuration of Citadel that is being used to compromise password management and authentication solutions. It instructs the malware to start key logging when some processes are running. \cite{securityintelligence:citadel}
+
+In this paper we discuss different ways for a keylogger to steal a password. Then we propose methods to prevent this attacks using some unique features of GNU/Linux operating system.
+
+\section{Problem Definition}
+\label{problems}
+
+\subsection{Keylogger connects to XServer}
+
+X Server is a program in the X Window System that runs on local machines and handles all access to the graphics cards, display screens and input devices (typically a keyboard and mouse) on those computers. \cite{linfo:xserver} 
+
+A keylogger can simply connect to X Server and get every X event such as key stroke or mouse movement. An example program is \texttt{xev} which prints out every X event happening in a window.
+
+\subsection{Running similar program by keylogger}
+
+A Keylogger can run a program similar to password manager and trick user to enter master password. Then it can also pass the master password to real password manager and user will not even notice the existence of keylogger.
+
+\subsection{Third-party applications authentication}
+
+One of the most popular services of password managers is to provide API\footnote{Application Programming Interface} so other applications could directly communicate with password manager to save and retrieve their credentials. This programs need to authenticate themselves with password manager. We need to provide a secure way to authenticate this applications.
+
+\section{GNU/Linux Features}
+
+\IEEEPARstart{B}{efore} we start to propose our method, here are some features of GNU/Linux that we are going to use:
+
+\subsection{Device Abstraction}
+
+GNU/Linux abstracts all I/O devices using file and directories. Devices are usually abstracted under \texttt{/dev} directory. reading from and writing into a device is equal to write and read from these files. e.g. One could read raw keyboard commands by opening \texttt{/dev/kbd/keyboardname} 
+
+\subsection{Grabbing Device}
+
+Using ioctl system-call a program with sufficients permission can exclusively using an I/O device. 
+
+The sufficient permissions for doing so is the effective group of the application to be input or the effective user to be root.
+
+\subsection{Unix Sockets}
+
+A Unix domain socket or IPC socket (inter-process communication socket) is a data communications endpoint for exchanging data between processes executing on the same host operating system. Unix domain sockets support transmission of a reliable stream of bytes. \cite{wiki:unixsock}
+
+UNIX domain sockets support passing file descriptors or process credentials to other processes using ancillary data. Setting \texttt{SO\_PASSCRED} flag enables the receiving of the credentials of the sending process in an ancillary message. \cite{linuxman:unix}
+
+\subsection{proc pseudo-filesystem}
+
+The proc filesystem is a pseudo-filesystem which provides an interface to kernel data structures and commonly mount at /proc. \cite{linuxman:proc}
+
+Using proc filesystem we can obtain informations about a process. e.g. /proc/100/exe is a symlink to the executable file of process with \texttt{PID} 100.
+
+\subsection{setuid and setgid flags}
+
+\texttt{setuid} and \texttt{setgid} (short for ``set user ID upon execution'' and ``set group ID upon execution'', respectively) are Unix access rights flags that allow users to run an executable with the permissions of the executable's owner or group respectively and to change behavior in directories. They are often used to allow users on a computer system to run programs with temporarily elevated privileges in order to perform a specific task. While the assumed user id or group id privileges provided are not always elevated, at a minimum they are specific. \cite{wiki:setuidgid}
+
+\subsection{tty}
+
+ttys are I/O devices which can be used to run programs. They act like traditional TeleTYpes which used to provide programs input and print it's output. Like other I/O devices ttys are also files located on \texttt{/dev/tty[n]}. Every program can write to a tty but no one except root can read from it. 
+
+\section{Proposed Method}
+
+\IEEEPARstart{I}{n} this section we explain our proposed method for problems mentioned in section \ref{problems}. Each method has some consequences that we try to solve those too.
+
+\subsection{Connecting to X Server}
+
+In order to make sure that no one else (specially X Server) can capture key strokes from keyboard, the password manager software can grab the keyboard device. But this action require the password manager software to run as root user or input group. For doing so, we separate a small program from password manager and name it password getter. 
+
+
+This programs responsibility is to get master password from user and compare it to the saved master password hash. If matched then pass it to main password manager otherwise send failure message. So we change 
+it's group to \texttt{input} and then set the \texttt{setgid} flag. 
+
+For the communication between password getter and main password manager software we use unix sockets. But the problem is that a keylogger can simply replace itself with password getter and steal the master password from user. After stealing password keylogger can also send this password to main password manager and user will not even notice the presence of keylogger.
+
+To solve this problem we introduce an authenticated socket below and use it to make sure that a connected app is actually the correct app.
+
+\subsubsection{Authenticated Socket}
+\label{authentic}
+
+Every client program that wants to send a message to a server, must set \texttt{SO\_PASSCRED} flag on it's unix socket.
+
+Any server program that wants to verify a connected client app should follow these steps:
+
+\begin{enumerate}
+
+\item Set the \texttt{SO\_PEERCRED} flag in order to recieve credential of connected app.
+\item extract the \texttt{PID} from credential.
+\item use proc filesystem to find connected apps executable path
+\item calculate hash of connected app executable file.
+\item if calculated hash and executable file path matched with the saved one and connected app didn't have write permission then allow.
+\item else reject
+
+\end{enumerate}
+
+
+\subsection{Running Similar Program}
+
+In order to solve this problem, password manager and user agree upon a common secret word. Every time the password getter program started to get master password from user this secret code 
+will show to user so user can make sure that it's not a mocked version of password getter.
+
+
+The first consequence of this method is that we need to save secret word (and not it's hash) somewhere so that the ordinary user of computer can not access it. 
+
+So we save this password in a file and change it's permission in a way that only applications with effective group id of passwordmanager can read it.
+
+We seperate a small program from password getter named password retriever and change it's group to passwordmanager so it can read secret code. Now we connect password getter and password retriever using authinticated socket that we presented in \ref{authentic}
+
+
+The second problem is that a keylogger can take a screenshot and use image processing techniques to obtain the secret code. In order to avoid this problem we run password getter program on 
+another tty. As we described before ttys are devices that every one can write to but no one (except root) can read from it. The password getter now behave like this :
+
+\begin{enumerate}
+\item show user the secret code that got from password retriever and a random string to exit and ask user to enter master password
+\item if user entered random string to exit then send main password manager request to exit
+\item else if user entered wrong password, refresh the random code and restart this process.
+\item else if user entered correct password, send master password to main password manager software and exit password getter.
+\end{enumerate}
+
+note that the keylogging software can override the random code or secret code (because everyone can write to a tty) but this is against it's goals to be stealthy.
+
+\subsection{API Authentication} 
+
+To authenticate applications, we use a similar algorithm to authenticated socket which we introduced before in \ref{authentic}. Here's the initial version of algorithm :
+
+\begin{enumerate}
+
+\item We calculate the executable path and hash from \texttt{PID} of connected socket
+\item If connected app has write permission then reject app.
+\item If an application with calculated executable path and hash already existed in database then allow app to connect.
+\item Otherwise show user application's new information and prompt user if it's OK. If user allowed then allow and add/update new information to database.
+\item else reject
+
+\end{enumerate}
+
+The problem here is that if we use a GUI over X Server for prompting user, one can simply write a script to automatically click OK and allow every connected application. To prevent this we separate an application and run it over a tty to prompt user and return the result to main password manager program. Our prompt consists of 5 parts. 
+
+
+\begin{enumerate}
+
+\item Message we want to show to user
+\item Executable path of connected app \label{execpath}
+\item Executable hash of connected app \label{exechash}
+\item A random code to allow access
+\item A random code to reject app.
+
+\end{enumerate}
+
+As we mentioned before everyone can write to a tty so we should make sure that no one can replace part \ref{execpath} and \ref{exechash} of the message. For doing so, we print these 5 parts in 5 random points of the page. In a 56x200 tty the chance of changing the executable path is 0.000000008 which is a very small number and hard to achieve.
+
+% \section{Conclusion}
+
+
+
+\ifCLASSOPTIONcaptionsoff
+ \newpage
+\fi
+
+
+
+\bibliography{refs}
+
+
+\begin{IEEEbiography}{Michael Shell}
+Biography text here.
+\end{IEEEbiography}
+
+
+\begin{IEEEbiographynophoto}{John Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+
+\begin{IEEEbiographynophoto}{Jane Doe}
+Biography text here.
+\end{IEEEbiographynophoto}
+
+
+\end{document}
+
+
