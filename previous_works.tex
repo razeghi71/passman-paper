@@ -1,0 +1,17 @@
+\section{Previous Works}
+
+In this section we are going to review methods previously proposed to protect password managers against keyloggers and see their advantage and disadvantages : 
+
+\subsection{Two Channel Auto-Type Obfuscation(TCATO)}
+
+KeePass password manager use software simulated key presses to enter password into a password field. To prevent keyloggers from logging this simulated key stokes there's an option in KeePass named Two Channel Auto-Type Obfuscation(TCATO). By enabling TCATO, instead of transferring all of password using simulated key strokes, KeePass transfer some parts of the password using windows clipboard and the rest using simulated key strokes.
+
+The advantage of this method is that a standard keylogger can not capture the password because some parts of the password are just pasted using ctrl+v and a standard keylogger can not read pasted data. Also a clipboard spy can not understand the password because just some parts of the password transferred using clipboard. 
+
+The main disadvantage of this method is that a smart keylogger can find out the password simply by monitoring the clipboard and key presses at the same time and reverse the algorithm used in this method.
+
+\subsection{Using virtual keyboard}
+
+Some password managers such as Kaspersky password manager provide virtual keyboards for users to enter their passwords. 
+
+This method prevent standard keyloggers since they only capture key stokes on the keyboard. But a smart screen grabber can take screenshots and using simple image processing find out which keys user pressed on the virtual keyboard.

@@ -1,0 +1,20 @@
+\section{Introduction}
+
+\IEEEPARstart{T}{he} Number of applications that require authentication continues to grow and the vast majority of users choose simple passwords and re-use them over these applications. As a solution, password manager softwares introduced to help users create strong passwords and remember them. These softwares require user to just memorize one single strong master password and access their other passwords using this one.
+
+Keyloggers are often softwares that are intentionally implanted on victims computer in order to capture their key strokes. This captured activity can be then delivered to a third-party attacker \cite{holz2009learning} and be used to compromise users credentials.
+
+Password managers main task is to organize passwords and they have little to do with users security, specially against keyloggers. Once a keylogger installs on a computer it can capture all passwords as they are typed by user, regardless of installation of a password manager. Also if a keylogger record the master password of a password manager, the attacker will be able to access all saved passwords by simply decrypt the password database.
+
+As an example we can mention Citadel malware, which infected millions of computers around the world. When Citadel installs on a computer, it starts to communicate with a command and control(C\&C) server and receive configuration files that contains the instructions it must follow. In November 2014 researchers at IBM Trusteer found a Citadel configuration which directly aimed password management and authentication solutions. This configuration instructs citadel to start a keylogger when password manager softwares such as KeePass started. \cite{securityintelligence:citadel}
+
+In this paper we are going to present a method to construct a password manager secured against keyloggers by:
+
+\begin{enumerate}
+
+\item Not let any other application use keyboard while user entering passwords by grabbing raw keyboard device.
+\item Introduce an authenticated socket using unix domain sockets and proc filesystem for process communication
+\item Using ttys to prevent screen-grabbers from reading any secret
+\end{enumerate}
+
+This paper organized as follows. Section 2 will describe the previous related works then our proposed method will discussed in section 3. In section 4 we present our implemented  password manager named PassMan and section 5 will concludes the Paper.  
